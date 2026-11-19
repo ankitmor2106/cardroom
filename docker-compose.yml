@@ -1,0 +1,20 @@
+services:
+  cardroom:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      WEB_ORIGIN: ${WEB_ORIGIN:-*}
+      SESSION_SECRET: ${SESSION_SECRET:-cardroom_production_session_secret_32_chars_long_entropy}
+      # Set to file:/app/data/cardroom.db for SQLite persistence, or leave empty for in-memory mode:
+      DATABASE_URL: ${DATABASE_URL:-file:/app/data/cardroom.db}
+    volumes:
+      - cardroom_data:/app/data
+
+volumes:
+  cardroom_data:

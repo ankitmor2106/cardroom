@@ -1,0 +1,38 @@
+{
+  "name": "cardroom-platform",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n web,server -c cyan,green \"npm:dev:web\" \"npm:dev:server\"",
+    "dev:web": "npm --workspace @cardroom/web run dev",
+    "dev:server": "npm --workspace @cardroom/server run dev",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:unit": "npm --workspace @cardroom/game-engines test",
+    "test:engine-smoke": "node scripts/prepare-engine-smoke.mjs && node scripts/engine-smoke.mjs && node scripts/blackjack-smoke.mjs && node scripts/blackjack-picker-smoke.mjs && node scripts/teen-patti-smoke.mjs && node scripts/callbreak-smoke.mjs",
+    "lint": "eslint apps packages --max-warnings=0",
+    "db:generate": "npm --workspace @cardroom/server run db:generate",
+    "db:migrate": "npm --workspace @cardroom/server run db:migrate",
+    "db:push": "npm --workspace @cardroom/server run db:push",
+    "db:deploy": "npm --workspace @cardroom/server run db:deploy"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "eslint": "^10.13.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
+    "typescript-eslint": "^8.72.1"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "overrides": {
+    "tslib": "2.8.1"
+  },
+  "type": "module"
+}
