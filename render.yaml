@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: cardroom
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: WEB_ORIGIN
+        value: "*"
+      - key: SESSION_SECRET
+        generateValue: true
+      # Leave blank for in-memory mode (recommended for Free tier)
+      # Or set to file:/app/data/cardroom.db if you attach a persistent Disk
+      - key: DATABASE_URL
+        value: ""
