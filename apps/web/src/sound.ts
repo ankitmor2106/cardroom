@@ -90,6 +90,29 @@ function playCardNoise(context: AudioContext, destination: AudioNode, duration: 
   source.addEventListener("ended", () => { source.disconnect(); filter.disconnect(); gain.disconnect(); }, { once: true });
 }
 
+/** Tiny pitched impacts make chips and cards feel less like notification beeps. */
+function playImpact(context: AudioContext, destination: AudioNode, frequency: number, level: number, delay = 0): void {
+  const start = context.currentTime + delay;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  const filter = context.createBiquadFilter();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(frequency, start);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(80, frequency * .68), start + .055);
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(frequency * 1.3, start);
+  filter.Q.setValueAtTime(5, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(Math.max(.0002, level), start + .003);
+  gain.gain.exponentialRampToValueAtTime(.0001, start + .075);
+  oscillator.connect(filter);
+  filter.connect(gain);
+  gain.connect(destination);
+  oscillator.start(start);
+  oscillator.stop(start + .085);
+  oscillator.addEventListener("ended", () => { oscillator.disconnect(); filter.disconnect(); gain.disconnect(); }, { once: true });
+}
+
 /**
  * Warm, restrained UI/game sounds. The audio graph uses a compressor so result
  * cues stay consistent in volume. Audio starts/resumes only after user gesture.
@@ -110,29 +133,34 @@ export function playUiSound(kind: SoundKind = "tap", delaySeconds = 0): void {
   try {
     switch (kind) {
       case "tap":
-        tone(490, 430, 0.075, 0.022, "sine");
+        tone(510, 420, 0.07, 0.019, "sine");
+        playImpact(context, destination, 1_250, .008 * volume, delaySeconds);
         break;
       case "card":
-        paper(0.09, 0.018, 2_400, 950);
-        tone(620, 510, 0.09, 0.018, "triangle", 0.008);
+        paper(0.105, 0.024, 3_100, 720);
+        tone(680, 450, 0.075, 0.012, "triangle", 0.006);
+        playImpact(context, destination, 760, .008 * volume, delaySeconds + .025);
         break;
       case "deal":
-        paper(0.13, 0.025, 2_100, 720);
-        tone(430, 350, 0.12, 0.018, "sine", 0.014);
+        paper(0.12, 0.032, 2_700, 510);
+        tone(370, 270, 0.09, 0.012, "triangle", 0.012);
+        playImpact(context, destination, 560, .009 * volume, delaySeconds + .032);
         break;
       case "shuffle":
-        paper(0.48, 0.026, 1_650, 370);
-        paper(0.34, 0.013, 1_200, 320, 0.16);
-        tone(175, 225, 0.34, 0.014, "triangle", 0.025);
+        paper(0.28, 0.035, 2_100, 280);
+        paper(0.31, 0.029, 1_650, 240, 0.16);
+        paper(0.16, 0.018, 1_150, 220, 0.37);
+        tone(150, 205, 0.4, 0.011, "triangle", 0.02);
         break;
       case "reveal":
-        paper(0.085, 0.014, 2_500, 1_100);
-        tone(390, 520, 0.17, 0.02, "sine", 0.012);
-        tone(520, 690, 0.2, 0.015, "sine", 0.12);
+        paper(0.09, 0.02, 3_200, 1_000);
+        tone(350, 523, 0.15, 0.019, "sine", 0.012);
+        tone(523, 784, 0.24, 0.016, "triangle", 0.105);
         break;
       case "chip":
-        tone(780, 650, 0.055, 0.018, "triangle");
-        tone(980, 820, 0.07, 0.012, "sine", 0.045);
+        playImpact(context, destination, 1_780, .023 * volume, delaySeconds);
+        playImpact(context, destination, 1_180, .016 * volume, delaySeconds + .042);
+        tone(930, 690, 0.08, 0.009, "triangle", 0.006);
         break;
       case "split":
         tone(420, 520, 0.11, 0.018, "triangle");
