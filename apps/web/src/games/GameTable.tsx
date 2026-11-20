@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownToLine, ArrowUpRight, Check, CircleDollarSign, Flag, Layers, Pause, Play, RotateCcw, Shield, Trophy, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpRight, Check, CircleDollarSign, Coins, Flag, Layers, Pause, Play, RotateCcw, Shield, Trophy, Volume2, VolumeX, X } from "lucide-react";
 import type { GameId, RoomSummary } from "@cardroom/shared/contracts";
 import { SUITS, type PlayingCard as CardData, type Suit } from "@cardroom/shared/cards";
 import { blackjackValue, type BlackjackOutcome, type BlackjackState } from "@cardroom/shared/games/blackjack";
@@ -36,6 +36,7 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
   const [showTeenPattiDeal, setShowTeenPattiDeal] = useState(false);
   const [showCallbreakDeal, setShowCallbreakDeal] = useState(false);
   const [callbreakDealPasses, setCallbreakDealPasses] = useState<5 | 8>(5);
+  const [showResults, setShowResults] = useState(false);
   const teenPattiDealPlayed = useRef(false);
   const callbreakDealStage = useRef({ round: 0, stage: 0 as 0 | 1 | 2 });
   const callbreakHistoryLength = gameId === "callbreak" ? (state as CallbreakState).history.length : 0;
@@ -52,6 +53,9 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
     const previous = previousStatus.current;
     previousStatus.current = state.status;
     if (!online) return;
+    if (previous !== "complete" && state.status === "complete") {
+      setShowResults(true);
+    }
     if (gameId === "teen-patti" && previous !== "complete" && state.status === "complete") {
       const teen = state as TeenPattiState;
       playUiSound("reveal");
@@ -173,6 +177,7 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
   };
   const seats = gameId === "blackjack" ? (state as BlackjackState).players : (state as HoldemState | TeenPattiState | CallbreakState | RummyState).players;
   const me = seats.find(p => p.id === playerId);
+  const potAmount = gameId === "teen-patti" ? (state as TeenPattiState).pot : gameId === "holdem" ? (state as HoldemState).players.reduce((n, p) => n + p.totalContribution, 0) : 0;
   const myCards: CardData[] = gameId === "blackjack" ? (state as BlackjackState).players.find(p => p.id === playerId)?.hands.flatMap(h => h.cards) ?? []
     : gameId === "holdem" ? (state as HoldemState).players.find(p => p.id === playerId)?.hole ?? []
     : gameId === "teen-patti" ? (state as TeenPattiState).players.find(p => p.id === playerId)?.cards ?? []
@@ -212,7 +217,8 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
           const callbreakScore = callbreakPlayer ? formatCallbreakScore(callbreakPlayer.scoreTenths) : null;
           const callbreakSeatMeta = callbreakPlayer ? `Call ${callbreakPlayer.bid ?? "—"} · ${callbreakPlayer.tricksWon} tricks · ${callbreakScore} pts` : null;
           return <motion.div key={p.id} className={`opponent-seat opponent-${index} ${isActive ? "active" : ""} ${gameId === "blackjack" && complete && blackjackSummary ? `blackjack-seat-result result-${blackjackSummary.kind}` : ""} ${gameId === "teen-patti" && complete && teenPattiSettlement ? `teen-patti-seat-result result-${teenPattiSettlement.outcome}` : ""}`} layout>
-            <div className="seat-avatar">{playerName(p.id, room).slice(0, 1).toUpperCase()}{p.id === room?.hostId && <span className="host-crown"><Trophy size={10}/></span>}{gameId === "callbreak" && (seats as Array<{ id: string }>).indexOf(p) === (state as CallbreakState).dealerIndex && <span className="host-crown callbreak-dealer-badge" title="Dealer">D</span>}</div>
+            <div className="seat-avatar">{playerName(p.id, room).slice(0, 1).toUpperCase()}{p.id === room?.hostId && <span className="host-crown"><Trophy size={12}/></span>}{gameId === "callbreak" && (seats as Array<{ id: string }>).indexOf(p) === (state as CallbreakState).dealerIndex && <span className="host-crown callbreak-dealer-badge" title="Dealer">D</span>}</div>
+            {chips !== undefined && <div className="seat-chip-stack"><Coins size={16}/><span>{formatChips(chips)}</span></div>}
             <div className="seat-info"><b>{playerName(p.id, room)}</b><span>{chips !== undefined ? chipLabel(chips) : callbreakSeatMeta ?? `${cardsCount} cards`}</span>{gameId === "blackjack" && complete && blackjackSummary && <span className={`online-blackjack-outcome outcome-${blackjackSummary.kind}`}>{blackjackSummary.label} · {blackjackSummary.net > 0 ? "+" : blackjackSummary.net < 0 ? "−" : ""}{formatChips(Math.abs(blackjackSummary.net))}</span>}{gameId === "teen-patti" && complete && teenPattiSettlement && <span className={`tp-online-seat-outcome tp-online-${teenPattiSettlement.outcome}`}>{teenPattiSettlement.outcome === "winner" ? "Winner" : teenPattiSettlement.outcome === "shared" ? "Shared pot" : teenPattiSettlement.outcome === "folded" ? "Packed" : "Lost"} · {teenPattiSettlement.net > 0 ? "+" : teenPattiSettlement.net < 0 ? "−" : ""}{formatChips(Math.abs(teenPattiSettlement.net))}</span>}</div>
             <div className="seat-card-backs">{(() => {
               const exposed = gameId === "blackjack"
@@ -231,14 +237,14 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
         })}
       </div>
       <div className="table-center">
-        {gameId === "holdem" && <><div className="pot-label"><CircleDollarSign size={15}/> MAIN POT <b>{chipLabel((state as HoldemState).players.reduce((n, p) => n + p.totalContribution, 0))}</b></div><div className="community-cards">{(state as HoldemState).community.map((c, i) => <PlayingCard key={c.id} card={c} index={i}/>)}</div></>}
+        {gameId === "holdem" && <><div className="pot-heap"><Coins size={28}/><div className="pot-heap-amount"><b>{formatChips((state as HoldemState).players.reduce((n, p) => n + p.totalContribution, 0))}</b><span>MAIN POT</span></div></div><div className="community-cards">{(state as HoldemState).community.map((c, i) => <PlayingCard key={c.id} card={c} index={i}/>)}</div></>}
         {gameId === "blackjack" && <><div className="pot-label">DEALER <b>{state.status === "betting" ? "WAITING FOR BETS" : state.status === "complete" ? "REVEALED" : "SHOWING"}</b></div><div className="community-cards">{(state as BlackjackState).dealer.map((c, i) => <PlayingCard key={c.id} card={c} index={i} dealIn={online}/>)}{(state as BlackjackState & { dealerHidden?: number }).dealerHidden ? <PlayingCard hidden dealIn={online}/> : null}</div>{complete && <span className={`online-dealer-result ${blackjackValue((state as BlackjackState).dealer).total > 21 ? "dealer-bust" : "dealer-stands"}`}>{blackjackValue((state as BlackjackState).dealer).total > 21 ? "Dealer bust" : blackjackValue((state as BlackjackState).dealer).total === 21 && (state as BlackjackState).dealer.length === 2 ? "Dealer blackjack" : `Dealer stands on ${blackjackValue((state as BlackjackState).dealer).total}`}</span>}</>}
-        {gameId === "teen-patti" && <><div className="pot-label">THE POT <b>{chipLabel((state as TeenPattiState).pot)}</b></div><div className="center-emblem">♥</div><p className="table-center-note">Three cards. One winning hand.</p></>}
+        {gameId === "teen-patti" && <><div className="pot-heap"><Coins size={28}/><div className="pot-heap-amount"><b>{formatChips((state as TeenPattiState).pot)}</b><span>THE POT</span></div></div><div className="center-emblem">♥</div><p className="table-center-note">Three cards. One winning hand.</p></>}
         {gameId === "callbreak" && <><div className="pot-label">ROUND {(state as CallbreakState).round} <b>{state.status === "trump-selection" ? "TRUMP SELECTION · 5 CARDS" : state.status === "bidding" ? "BIDDING" : state.status === "playing" ? `TRICK ${(state as CallbreakState).trickNumber + 1} / 13` : state.status === "complete" ? "MATCH COMPLETE" : "ROUND SCORED"}</b></div><div className="trick-cards">{(state as CallbreakState).trick.map((p, i) => <motion.div key={p.card.id} className="trick-card" initial={{ opacity: 0, y: -12, scale: .88, rotate: i % 2 ? 3 : -3 }} animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }} transition={{ duration: .24, ease: "easeOut" }}><PlayingCard card={p.card}/><span>{playerName(p.playerId, room)}</span></motion.div>)}</div><p className="table-center-note">{(state as CallbreakState).status === "trump-selection" ? `Trump decision order: ${(state as CallbreakState).trumpOrder?.map(id => playerName(id, room)).join(" → ") ?? "Lowest score first"}` : `Trump: ${(state as CallbreakState).trumpSuit ?? "spades"} · ${state.status === "bidding" ? "Calls follow the trump choice" : ((state as CallbreakState).players[(state as CallbreakState).leaderIndex]?.id === playerId) ? "You lead this trick" : `Lead: ${playerName((state as CallbreakState).players[(state as CallbreakState).leaderIndex]?.id ?? "", room)}`}`}</p></>}
         {(gameId === "rummy-13" || gameId === "rummy-10") && <><div className="pot-label">WILD RANK <b>{({ 11: "J", 12: "Q", 13: "K", 14: "A" } as Record<number, string>)[(state as RummyState).wildRank] ?? (state as RummyState).wildRank}</b></div><div className="rummy-piles"><div className="pile-card">{(state as RummyState).wildIndicator ? <PlayingCard card={(state as RummyState).wildIndicator} small/> : <span className="wild-indicator-fallback">WILD</span>}<span>WILD CARD</span></div><div className="pile-card"><PlayingCard hidden/><span>DRAW PILE</span></div><div className="pile-card"><PlayingCard card={(state as RummyState).discardPile[(state as RummyState).discardPile.length - 1]}/><span>DISCARD</span></div></div><p className="table-center-note">{gameId === "rummy-10" ? "3 sets · sizes 3–3–4 · no runs" : "2 sequences minimum · 1 pure sequence"}</p></>}
         {complete && <div className="winner-banner"><Trophy size={20}/><span>{winnerText(gameId, state, room)}</span></div>}
       </div>
-      <div className="my-seat"><div className={`my-player-info ${isMyTurn ? "active" : ""} ${gameId === "blackjack" && complete && me ? `blackjack-seat-result result-${getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).kind}` : ""}`}><div className="seat-avatar self">{playerName(playerId, room).slice(0, 1).toUpperCase()}{gameId === "callbreak" && seats.findIndex(player => player.id === playerId) === (state as CallbreakState).dealerIndex && <span className="host-crown callbreak-dealer-badge" title="Dealer">D</span>}</div><div><b>{playerName(playerId, room)}</b><span>{me && "chips" in me ? chipLabel(me.chips) : me && gameId === "callbreak" ? `Call ${(me as CallbreakState["players"][number]).bid ?? "—"} · ${(me as CallbreakState["players"][number]).tricksWon} tricks · ${formatCallbreakScore((me as CallbreakState["players"][number]).scoreTenths)} pts` : `${myCards.length} cards`}</span>{gameId === "blackjack" && complete && me && <span className={`online-blackjack-outcome outcome-${getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).kind}`}>{getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).label} · {getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).net > 0 ? "+" : getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).net < 0 ? "−" : ""}{formatChips(Math.abs(getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).net))}</span>}</div><span className="you-tag">YOU</span></div>
+      <div className="my-seat"><div className={`my-player-info ${isMyTurn ? "active" : ""} ${gameId === "blackjack" && complete && me ? `blackjack-seat-result result-${getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).kind}` : ""}`}><div className="seat-avatar self">{playerName(playerId, room).slice(0, 1).toUpperCase()}{gameId === "callbreak" && seats.findIndex(player => player.id === playerId) === (state as CallbreakState).dealerIndex && <span className="host-crown callbreak-dealer-badge" title="Dealer">D</span>}</div><div><b>{playerName(playerId, room)}</b><span>{me && "chips" in me ? chipLabel(me.chips) : me && gameId === "callbreak" ? `Call ${(me as CallbreakState["players"][number]).bid ?? "—"} · ${(me as CallbreakState["players"][number]).tricksWon} tricks · ${formatCallbreakScore((me as CallbreakState["players"][number]).scoreTenths)} pts` : `${myCards.length} cards`}</span>{gameId === "blackjack" && complete && me && <span className={`online-blackjack-outcome outcome-${getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).kind}`}>{getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).label} · {getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).net > 0 ? "+" : getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).net < 0 ? "−" : ""}{formatChips(Math.abs(getBlackjackPlayerSummary(me as BlackjackState["players"][number], state as BlackjackState).net))}</span>}</div>{me && "chips" in me && <div className="seat-chip-stack self-chip"><Coins size={16}/><span>{formatChips(me.chips)}</span></div>}<span className="you-tag">YOU</span></div>
         <div className={`my-hand ${gameId.startsWith("rummy") ? "rummy-hand" : ""}`}>
           {hideMyTeenPattiCards
             ? Array.from({ length: Math.max(3, sortedCards.length) }, (_, index) => <PlayingCard key={`teen-patti-hidden-${index}`} hidden small dealIn={online}/>)
@@ -252,25 +258,25 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
         {showTeenPattiDeal && online && gameId === "teen-patti" && <OnlineTeenPattiDeal key="teen-patti-deal" playerCount={seats.length} mySeatIndex={Math.max(0, seats.findIndex(player => player.id === playerId))}/>}
         {showCallbreakDeal && online && gameId === "callbreak" && <OnlineCallbreakDeal key={`callbreak-deal-${(state as CallbreakState).round}-${callbreakDealPasses}`} playerCount={seats.length} dealerIndex={(state as CallbreakState).dealerIndex ?? 0} mySeatIndex={Math.max(0, seats.findIndex(player => player.id === playerId))} passCount={callbreakDealPasses}/> }
       </AnimatePresence>
-    </div>
-
-    {complete && gameId === "blackjack" && <OnlineBlackjackResults state={state as BlackjackState} room={room}/>}
-    {complete && gameId === "teen-patti" && <OnlineTeenPattiResults state={state as TeenPattiState} room={room}/>}
-    {callbreakRoundComplete && <OnlineCallbreakResults state={state as CallbreakState} room={room}/>}
-    {error && <div className="game-error" role="alert">{error}</div>}
-    <div className="game-action-panel">
-      <div className="action-context"><span className={`turn-dot ${isMyTurn ? "active" : ""}`}/><div><b>{callbreakRoundComplete ? complete ? "Match complete" : "Round scored" : complete ? "Game complete" : gameId === "blackjack" && state.status === "betting" ? "Place your wager" : isMyTurn ? "Your move" : "Waiting for opponent"}</b><small>{contextText(gameId, state, activeId, playerId)}</small></div></div>
-      <div className="action-buttons">
-        {gameId === "blackjack" && <BlackjackControls state={state as BlackjackState} playerId={playerId} isMyTurn={isMyTurn} hostId={room?.hostId} room={room} onAction={emit}/>}
-        {gameId === "holdem" && <HoldemControls state={state as HoldemState} playerId={playerId} isMyTurn={isMyTurn} raise={raise} setRaise={setRaise} onAction={emit}/>}
-        {gameId === "teen-patti" && <TeenPattiControls state={state as TeenPattiState} playerId={playerId} isMyTurn={isMyTurn} dealing={showTeenPattiDeal} onAction={emit}/>}
-        {gameId === "callbreak" && <CallbreakControls state={state as CallbreakState} playerId={playerId} isMyTurn={isMyTurn} dealing={showCallbreakDeal} canStart={!online || room?.hostId === playerId} selectedCard={selectedCard} setBid={setBid} bid={bid} onAction={emit}/> }
-        {(gameId === "rummy-13" || gameId === "rummy-10") && <RummyControls state={state as RummyState} playerId={playerId} isMyTurn={isMyTurn} mode={rummyMode} setMode={setRummyMode} selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} selectedCard={selectedCard} setSelectedCard={setSelectedCard} groups={groups} setGroups={setGroups} onAction={emit}/>}
-        {complete && online && room?.hostId === playerId && (gameId === "blackjack" || gameId === "teen-patti") && <Button onClick={() => emit("next-round")}><RotateCcw size={15}/> Play next round</Button>}
-        {complete && <Button variant="outline" onClick={onExit}>{online ? "View results" : "Back to games"} <ArrowUpRight size={16}/></Button>}
+      <div className="table-action-panel">
+        <div className="action-context"><span className={`turn-dot ${isMyTurn ? "active" : ""}`}/><div><b>{callbreakRoundComplete ? complete ? "Match complete" : "Round scored" : complete ? "Game complete" : gameId === "blackjack" && state.status === "betting" ? "Place your wager" : isMyTurn ? "Your move" : "Waiting for opponent"}</b><small>{contextText(gameId, state, activeId, playerId)}</small></div></div>
+        <div className="action-buttons">
+          {gameId === "blackjack" && <BlackjackControls state={state as BlackjackState} playerId={playerId} isMyTurn={isMyTurn} hostId={room?.hostId} room={room} onAction={emit}/>}
+          {gameId === "holdem" && <HoldemControls state={state as HoldemState} playerId={playerId} isMyTurn={isMyTurn} raise={raise} setRaise={setRaise} onAction={emit}/>}
+          {gameId === "teen-patti" && <TeenPattiControls state={state as TeenPattiState} playerId={playerId} isMyTurn={isMyTurn} dealing={showTeenPattiDeal} onAction={emit}/>}
+          {gameId === "callbreak" && <CallbreakControls state={state as CallbreakState} playerId={playerId} isMyTurn={isMyTurn} dealing={showCallbreakDeal} canStart={!online || room?.hostId === playerId} selectedCard={selectedCard} setBid={setBid} bid={bid} onAction={emit}/> }
+          {(gameId === "rummy-13" || gameId === "rummy-10") && <RummyControls state={state as RummyState} playerId={playerId} isMyTurn={isMyTurn} mode={rummyMode} setMode={setRummyMode} selectedGroup={selectedGroup} setSelectedGroup={setSelectedGroup} selectedCard={selectedCard} setSelectedCard={setSelectedCard} groups={groups} setGroups={setGroups} onAction={emit}/>}
+          {complete && online && room?.hostId === playerId && (gameId === "blackjack" || gameId === "teen-patti") && <Button onClick={() => emit("next-round")}><RotateCcw size={17}/> Play next round</Button>}
+          {complete && <Button variant="outline" onClick={onExit}>{online ? "View results" : "Back to games"} <ArrowUpRight size={18}/></Button>}
+        </div>
       </div>
     </div>
-    <div className="game-footnote"><Shield size={13}/> Virtual chips only. No real-money wagering or cash value.</div>
+
+    {showResults && complete && gameId === "blackjack" && <OnlineBlackjackResults state={state as BlackjackState} room={room} onClose={() => setShowResults(false)}/>}
+    {showResults && complete && gameId === "teen-patti" && <OnlineTeenPattiResults state={state as TeenPattiState} room={room} onClose={() => setShowResults(false)}/>}
+    {showResults && callbreakRoundComplete && <OnlineCallbreakResults state={state as CallbreakState} room={room} onClose={() => setShowResults(false)}/>}
+    {error && <div className="game-error" role="alert">{error}</div>}
+    <div className="game-footnote"><Shield size={15}/> Virtual chips only. No real-money wagering or cash value.</div>
   </div>;
 }
 
@@ -290,9 +296,10 @@ function getBlackjackPlayerSummary(player: BlackjackState["players"][number], st
   return { kind, label: labels[kind], net: state.results[player.id] ?? player.hands.reduce((sum, hand) => sum + (hand.net ?? ((hand.payout ?? 0) - hand.bet)), 0) };
 }
 
-function OnlineBlackjackResults({ state, room }: { state: BlackjackState; room?: RoomSummary }) {
+function OnlineBlackjackResults({ state, room, onClose }: { state: BlackjackState; room?: RoomSummary; onClose?: () => void }) {
   return <motion.section className="online-blackjack-results" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.38 }} aria-live="polite">
     <div className="online-blackjack-results-heading"><span className="eyebrow">ROUND SETTLED</span><h2>Every seat, accounted for.</h2><p>Individual hand outcomes and net chip changes. Dealer: {blackjackValue(state.dealer).total > 21 ? "bust" : blackjackValue(state.dealer).total === 21 && state.dealer.length === 2 ? "Blackjack" : `stood on ${blackjackValue(state.dealer).total}`}.</p></div>
+    {onClose && <div className="results-close-bar"><Button variant="outline" onClick={onClose}><X size={16}/> Close results</Button></div>}
     <div className="online-blackjack-results-grid">{state.players.map((player, index) => {
       const result = getBlackjackPlayerSummary(player, state);
       return <motion.article key={player.id} className={`online-blackjack-result-card result-${result.kind}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.055 }}>
@@ -356,7 +363,7 @@ function OnlineCallbreakDeal({ playerCount, dealerIndex, mySeatIndex, passCount 
   </motion.div>;
 }
 
-function OnlineCallbreakResults({ state, room }: { state: CallbreakState; room?: RoomSummary }) {
+function OnlineCallbreakResults({ state, room, onClose }: { state: CallbreakState; room?: RoomSummary; onClose?: () => void }) {
   const rows = state.players.map(player => ({
     ...player,
     roundScore: state.roundScores?.[player.id] ?? 0,
@@ -373,6 +380,7 @@ function OnlineCallbreakResults({ state, room }: { state: CallbreakState; room?:
     <div className="callbreak-online-score-scroll"><table className="callbreak-online-score-table"><thead><tr><th>Player</th><th>Call</th><th>Tricks</th><th>Contract</th><th>Round score</th><th>Total points</th></tr></thead><tbody>{rows.map((row, index) => <tr key={row.id} className={(state.winnerIds ?? []).includes(row.id) ? "winner-row" : ""}><td><span className="callbreak-online-rank">{index === 0 ? <Trophy size={14}/> : index + 1}</span><b>{playerName(row.id, room)}</b>{(state.winnerIds ?? []).includes(row.id) && <small>WINNER</small>}</td><td>{row.bid ?? "—"}{row.minimumCall > 1 && <small>Trump minimum {row.minimumCall}</small>}</td><td>{row.tricksWon}</td><td><span className={`callbreak-contract ${row.made ? "made" : "missed"}`}>{row.made ? "Made" : "Missed"}</span><small>{row.made ? `${row.tricksWon - (row.bid ?? 0)} overtrick${row.tricksWon - (row.bid ?? 0) === 1 ? "" : "s"}` : `Short by ${(row.bid ?? 0) - row.tricksWon}`}</small></td><td className={row.roundScore >= 0 ? "positive" : "negative"}>{formatCallbreakScore(row.roundScore)}</td><td><b>{formatCallbreakScore(row.scoreTenths)}</b></td></tr>)}</tbody></table></div>
     {!final && <div className="callbreak-online-next-note"><span><b>Next dealer</b>{nextDealer ? playerName(nextDealer.id, room) : "—"}</span><span>Next round is dealt by the host.</span></div>}
     {final && <div className="callbreak-online-champion"><Trophy size={20}/><strong>{winners.join(" & ")}</strong><span>31-point target reached</span></div>}
+    {onClose && <div className="results-close-bar"><Button variant="outline" onClick={onClose}><X size={16}/> Close results</Button></div>}
   </motion.section>;
 }
 
@@ -399,11 +407,12 @@ function OnlineTeenPattiDeal({ playerCount, mySeatIndex }: { playerCount: number
   </motion.div>;
 }
 
-function OnlineTeenPattiResults({ state, room }: { state: TeenPattiState; room?: RoomSummary }) {
+function OnlineTeenPattiResults({ state, room, onClose }: { state: TeenPattiState; room?: RoomSummary; onClose?: () => void }) {
   const winners = state.winnerIds ?? (state.winnerId ? [state.winnerId] : []);
   const winnerNames = winners.map(id => playerName(id, room));
   return <motion.section className="tp-online-results" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} aria-live="polite">
     <div className="tp-online-results-heading"><span className="eyebrow">ROUND SETTLED · {chipLabel(state.pot)}</span><h2>{winners.length > 1 ? `${winnerNames.join(" & ")} share the pot.` : `${winnerNames[0] ?? "The winner"} takes the pot.`}</h2><p>{state.result ? "Showdown completed. Active hands are ranked below." : "The winner was the last player remaining after everyone else packed."}</p></div>
+    {onClose && <div className="results-close-bar"><Button variant="outline" onClick={onClose}><X size={16}/> Close results</Button></div>}
     <div className="tp-online-results-grid">{state.players.map((player, index) => {
       const row = state.settlement?.find(item => item.playerId === player.id);
       const rank = row?.rank;
