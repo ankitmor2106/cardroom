@@ -6,6 +6,15 @@ export type RoomVisibility = "public" | "private";
 export type RoomStatus = "waiting" | "playing" | "finished";
 export type ConnectionStatus = "connected" | "reconnecting" | "disconnected";
 
+export interface TeenPattiRoomOptions {
+  /** Chips issued to each player when the first round starts. */
+  startingStack: number;
+  /** Mandatory boot / opening blind stake for each round. */
+  bootAmount: number;
+  /** Hard cap for the total pot in one round. */
+  maxPot: number;
+}
+
 export interface PlayerSummary {
   id: PlayerId;
   displayName: string;
@@ -26,6 +35,7 @@ export interface RoomSummary {
   players: PlayerSummary[];
   maxPlayers: number;
   createdAt: string;
+  gameOptions?: { teenPatti?: TeenPattiRoomOptions };
 }
 
 export interface PublicPlayerState {

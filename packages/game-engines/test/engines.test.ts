@@ -174,6 +174,68 @@ describe("Teen Patti ranking and classic betting rules", () => {
     expect(result.settlement?.find(row => row.playerId === "p1")?.reason).toMatch(/player who called the show loses the tie/);
     expect(result.players.reduce((sum, player) => sum + player.chips, 0)).toBe(1000);
   });
+  it("enforces the configured maximum pot and carries it into the next round", () => {
+    let state = createTeenPattiGame(
+      [{ id: "p1", chips: 100 }, { id: "p2", chips: 100 }],
+      10,
+      () => 0.4,
+      40,
+    );
+    expect(state.maxPot).toBe(40);
+    expect(() => teenPattiAction(state, "p1", "blind", 21)).toThrow(/between 10 and 20/);
+    state = teenPattiAction(state, "p1", "blind", 20);
+    expect(state.pot).toBe(40);
+    expect(state.status).toBe("complete");
+    expect(state.settlement).toHaveLength(2);
+    expect(state.players.reduce((sum, player) => sum + player.chips, 0)).toBe(200);
+    const next = teenPattiNextRound(state, () => 0.4);
+    expect(next.maxPot).toBe(40);
+  });
+  it("allows an exact short final wager to fill the remaining maximum pot", () => {
+    let state = createTeenPattiGame(
+      [{ id: "p1", chips: 100 }, { id: "p2", chips: 100 }],
+      10,
+      () => 0.4,
+      45,
+    );
+    state = teenPattiAction(state, "p1", "blind", 20);
+    expect(state.pot).toBe(40);
+    expect(teenPattiWagerBounds(state.currentStake, false, state.maxPot - state.pot)).toEqual({ min: 5, max: 5 });
+    state = teenPattiAction(state, "p2", "blind", 5);
+    expect(state.pot).toBe(45);
+    expect(state.status).toBe("complete");
+    expect(state.settlement).toHaveLength(2);
+  });
+  it("allows an odd seen wager only when it exactly fills the maximum pot", () => {
+    let state = createTeenPattiGame(
+      [{ id: "p1", chips: 100 }, { id: "p2", chips: 100 }],
+      10,
+      () => 0.4,
+      45,
+    );
+    state = teenPattiAction(state, "p1", "blind", 20);
+    state = teenPattiAction(state, "p2", "chaal", 5);
+    expect(state.pot).toBe(45);
+    expect(state.status).toBe("complete");
+
+    let shortStack = createTeenPattiGame(
+      [{ id: "p1", chips: 100 }, { id: "p2", chips: 100 }],
+      10,
+      () => 0.4,
+      60,
+    );
+    shortStack = { ...shortStack, players: shortStack.players.map(player => player.id === "p2" ? { ...player, chips: 15 } : player) };
+    shortStack = teenPattiAction(shortStack, "p1", "blind", 10);
+    expect(() => teenPattiAction(shortStack, "p2", "chaal", 15)).toThrow(/even number/);
+  });
+  it("rejects a configured pot cap that cannot cover the boot and opening wager", () => {
+    expect(() => createTeenPattiGame(
+      [{ id: "p1", chips: 100 }, { id: "p2", chips: 100 }],
+      10,
+      () => 0.4,
+      20,
+    )).toThrow(/Maximum pot must cover/);
+  });
   it("requires a seen player to have a seen opponent before calling a show", () => {
     let state = createTeenPattiGame([{ id: "p1", chips: 500 }, { id: "p2", chips: 500 }], 10, () => 0.4);
     state = { ...state, players: state.players.map((p, i) => ({ ...p, seen: i === 0 })) };

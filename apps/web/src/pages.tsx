@@ -50,11 +50,82 @@ export function GameIntroPage() {
 }
 
 export function CreateRoomPage() {
-  const navigate = useNavigate(); const [search] = useSearchParams(); const saved = useSessionStore(s => s.session); const [gameId, setGameId] = useState<GameId>((search.get("game") as GameId) || "blackjack"); const [name, setName] = useState("Friday night table"); const [displayName, setDisplayName] = useState(saved?.displayName ?? "Player"); const [maxPlayers, setMaxPlayers] = useState(4); const [visibility, setVisibility] = useState<"public" | "private">("private"); const [password, setPassword] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const maxAllowed = gameId === "blackjack" ? 9 : gameId === "holdem" ? 9 : gameId === "teen-patti" ? 6 : gameId === "callbreak" ? 4 : 6;
+  const navigate = useNavigate();
+  const [search] = useSearchParams();
+  const saved = useSessionStore(s => s.session);
+  const [gameId, setGameId] = useState<GameId>((search.get("game") as GameId) || "blackjack");
+  const [name, setName] = useState("Friday night table");
+  const [displayName, setDisplayName] = useState(saved?.displayName ?? "Player");
+  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [visibility, setVisibility] = useState<"private" | "public">("private");
+  const [password, setPassword] = useState("");
+  const [tpStartingStack, setTpStartingStack] = useState(1_000);
+  const [tpBootAmount, setTpBootAmount] = useState(10);
+  const [tpMaxPot, setTpMaxPot] = useState(1_000);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const maxAllowed = gameId === "blackjack" || gameId === "holdem" ? 9 : gameId === "teen-patti" ? 6 : gameId === "callbreak" ? 4 : 6;
   const minimum = gameId === "blackjack" ? 1 : gameId === "callbreak" ? 4 : 2;
-  const create = async (e: FormEvent) => { e.preventDefault(); setBusy(true); setError(""); try { await ensureGuest(displayName); const result = await api<{ room: RoomSummary }>("/api/rooms", { method: "POST", body: JSON.stringify({ name, gameId, displayName, maxPlayers, visibility, ...(visibility === "private" && password ? { password } : {}) }) }); navigate(`/room/${result.room.code}`); } catch (err) { setError(messageFrom(err)); } finally { setBusy(false); } };
-  return <div className="page-container standard-page narrow-page"><div className="page-heading"><div className="eyebrow">MAKE IT YOURS</div><h1>Create a <em>room.</em></h1><p>Set the table and invite your people. Your room starts private by default.</p></div><form className="form-card" onSubmit={e => void create(e)}><div className="form-grid"><label className="form-field wide"><span>Room name</span><input value={name} onChange={e => setName(e.target.value)} minLength={3} maxLength={32} required placeholder="Friday night table"/></label><label className="form-field"><span>Game</span><select value={gameId} onChange={e => { setGameId(e.target.value as GameId); setMaxPlayers(e.target.value === "callbreak" ? 4 : e.target.value === "blackjack" ? 4 : 6); }}><option value="blackjack">Blackjack</option><option value="holdem">Texas Hold’em</option><option value="teen-patti">Teen Patti</option><option value="callbreak">Callbreak</option><option value="rummy-13">13-card Rummy</option><option value="rummy-10">10-card Rummy · 3-3-4 sets</option></select></label><label className="form-field"><span>Maximum players</span><select value={maxPlayers} onChange={e => setMaxPlayers(Number(e.target.value))}>{Array.from({ length: maxAllowed - minimum + 1 }, (_, i) => minimum + i).map(n => <option key={n} value={n}>{n} players</option>)}</select></label><label className="form-field"><span>Your display name</span><input value={displayName} onChange={e => setDisplayName(e.target.value)} minLength={2} maxLength={20} required/></label><div className="form-field"><span>Room privacy</span><div className="segmented"><button type="button" className={visibility === "private" ? "active" : ""} onClick={() => setVisibility("private")}><LockKeyhole size={14}/> Private</button><button type="button" className={visibility === "public" ? "active" : ""} onClick={() => { setVisibility("public"); setPassword(""); }}><Users size={14}/> Public</button></div></div>{visibility === "private" && <label className="form-field wide"><span>Room password <small>Optional</small></span><input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={4} maxLength={64} placeholder="Add another layer of privacy"/></label>}</div>{gameId === "rummy-10" && <div className="form-callout"><Info size={16}/> This table uses 10-card 3-3-4 set rummy. It requires three same-rank sets sized 3, 3, and 4. Runs are not accepted.</div>}{gameId === "callbreak" && <div className="form-callout"><Info size={16}/> Online Callbreak uses exactly four players and a five-card trump auction before the remaining eight cards are dealt. Offline scorekeeping supports four players with 13 cards each, or three players after removing all 13 cards of any one suit; all players then receive 13 cards and play exactly 13 tricks. Offline bids are 1–13.</div>}{error && <div className="form-error" role="alert">{error}</div>}<Button type="submit" disabled={busy} className="form-submit">{busy ? "Creating room…" : "Create room"} <ArrowRight size={16}/></Button><p className="form-footnote"><ShieldCheck size={14}/> Virtual chips only. No real-money betting.</p></form></div>;
+  const minTeenPattiPot = tpBootAmount * (maxPlayers + 1);
+
+  const changeGame = (nextGame: GameId) => {
+    setGameId(nextGame);
+    setMaxPlayers(nextGame === "callbreak" ? 4 : nextGame === "blackjack" ? 4 : 6);
+  };
+
+  const create = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      if (gameId === "teen-patti") {
+        if (tpStartingStack < tpBootAmount * 2) throw new Error("Starting chips must cover the boot and one minimum opening wager.");
+        if (tpMaxPot < minTeenPattiPot) throw new Error(`Maximum pot must be at least ${minTeenPattiPot.toLocaleString("en-IN")} chips for ${maxPlayers} seats.`);
+      }
+      await ensureGuest(displayName);
+      const result = await api<{ room: RoomSummary }>("/api/rooms", {
+        method: "POST",
+        body: JSON.stringify({
+          name, gameId, displayName, maxPlayers, visibility,
+          ...(visibility === "private" && password ? { password } : {}),
+          ...(gameId === "teen-patti" ? { gameOptions: { teenPatti: { startingStack: tpStartingStack, bootAmount: tpBootAmount, maxPot: tpMaxPot } } } : {}),
+        }),
+      });
+      navigate(`/room/${result.room.code}`);
+    } catch (err) {
+      setError(messageFrom(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <div className="page-container standard-page narrow-page">
+    <div className="page-heading"><div className="eyebrow">MAKE IT YOURS</div><h1>Create a <em>room.</em></h1><p>Set the table and invite your people. Your room starts private by default.</p></div>
+    <form className="form-card" onSubmit={event => void create(event)}>
+      <div className="form-grid">
+        <label className="form-field wide"><span>Room name</span><input value={name} onChange={event => setName(event.target.value)} minLength={3} maxLength={32} required placeholder="Friday night table"/></label>
+        <label className="form-field"><span>Game</span><select value={gameId} onChange={event => changeGame(event.target.value as GameId)}><option value="blackjack">Blackjack</option><option value="holdem">Texas Hold’em</option><option value="teen-patti">Teen Patti</option><option value="callbreak">Callbreak</option><option value="rummy-13">13-card Rummy</option><option value="rummy-10">10-card Rummy · 3-3-4 sets</option></select></label>
+        <label className="form-field"><span>Maximum players</span><select value={maxPlayers} onChange={event => { const next = Number(event.target.value); setMaxPlayers(next); if (gameId === "teen-patti") setTpMaxPot(current => Math.max(current, tpBootAmount * (next + 1))); }}>{Array.from({ length: maxAllowed - minimum + 1 }, (_, index) => minimum + index).map(count => <option key={count} value={count}>{count} players</option>)}</select></label>
+        <label className="form-field"><span>Your display name</span><input value={displayName} onChange={event => setDisplayName(event.target.value)} minLength={2} maxLength={20} required/></label>
+        <div className="form-field"><span>Room privacy</span><div className="segmented"><button type="button" className={visibility === "private" ? "active" : ""} onClick={() => setVisibility("private")}><LockKeyhole size={14}/> Private</button><button type="button" className={visibility === "public" ? "active" : ""} onClick={() => { setVisibility("public"); setPassword(""); }}><Users size={14}/> Public</button></div></div>
+        {visibility === "private" && <label className="form-field wide"><span>Room password <small>Optional</small></span><input type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={4} maxLength={64} placeholder="Add another layer of privacy"/></label>}
+      </div>
+      {gameId === "teen-patti" && <section className="teen-patti-room-options" aria-labelledby="teen-patti-options-title">
+        <div className="teen-patti-room-options-heading"><span className="eyebrow">TABLE ECONOMICS</span><h2 id="teen-patti-options-title">Set up your Teen Patti table.</h2><p>These virtual-chip settings apply to every player. Stacks carry forward between rounds.</p></div>
+        <div className="form-grid">
+          <label className="form-field"><span>Starting chips per player</span><input type="number" min={tpBootAmount * 2} max={1_000_000_000} step={100} value={tpStartingStack} onChange={event => setTpStartingStack(Number(event.target.value))}/><small>Each player begins with this stack.</small></label>
+          <label className="form-field"><span>Boot / starting bid</span><input type="number" min={1} max={1_000_000} step={1} value={tpBootAmount} onChange={event => { const next = Math.max(1, Number(event.target.value) || 1); setTpBootAmount(next); setTpStartingStack(current => Math.max(current, next * 2)); setTpMaxPot(current => Math.max(current, next * (maxPlayers + 1))); }}/><small>Mandatory opening contribution each round.</small></label>
+          <label className="form-field wide"><span>Maximum pot per round</span><input type="number" min={minTeenPattiPot} max={50_000_000} step={100} value={tpMaxPot} onChange={event => setTpMaxPot(Number(event.target.value))}/><small>Betting stops at this hard cap and the active hands go to showdown. Minimum for {maxPlayers} seats: {minTeenPattiPot.toLocaleString("en-IN")} chips.</small></label>
+        </div>
+        <div className="teen-patti-options-summary"><span><b>{tpStartingStack.toLocaleString("en-IN")}</b> starting stack</span><span><b>{tpBootAmount.toLocaleString("en-IN")}</b> boot</span><span><b>{tpMaxPot.toLocaleString("en-IN")}</b> pot cap</span></div>
+      </section>}
+      {gameId === "rummy-10" && <div className="form-callout"><Info size={16}/> This table uses 10-card 3-3-4 set rummy. It requires three same-rank sets sized 3, 3, and 4. Runs are not accepted.</div>}
+      {gameId === "callbreak" && <div className="form-callout"><Info size={16}/> Online Callbreak uses exactly four players and a five-card trump auction before the remaining eight cards are dealt. Offline scorekeeping supports four players with 13 cards each, or three players after removing all 13 cards of any one suit; all players then receive 13 cards and play exactly 13 tricks. Offline bids are 1–13.</div>}
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <Button type="submit" disabled={busy} className="form-submit">{busy ? "Creating room…" : "Create room"} <ArrowRight size={16}/></Button>
+      <p className="form-footnote"><ShieldCheck size={14}/> Virtual chips only. No real-money betting.</p>
+    </form>
+  </div>;
 }
 
 export function JoinRoomPage() {
@@ -92,7 +163,7 @@ export function LobbyPage() {
   const leave = () => { socket?.emit("room:leave", () => navigate("/games")); if (!socket) navigate("/games"); };
   if (!room && !error) return <div className="page-loading"><span className="spinner"/> Finding your room…</div>;
   if (!room) return <div className="page-container standard-page"><EmptyState title="Room not found" text={error || "This invite may have expired or the room may have closed."} action={<Link to="/join" className="button button-gold">Try another code</Link>}/></div>;
-  return <div className="page-container standard-page narrow-page"><div className="lobby-heading"><div className="eyebrow">THE TABLE IS SETTING</div><h1>{room.name}</h1><p>{getGameTitle(room.gameId)} · {room.visibility === "private" ? "Private room" : "Public room"}</p></div><div className="room-invite-card"><div><span className="eyebrow">ROOM CODE</span><strong>{room.code}</strong><small>Share this code with friends</small></div><CopyShare room={room}/></div><div className="lobby-card"><div className="lobby-card-header"><div><h2>Players</h2><p>{room.players.length} of {room.maxPlayers} seats taken</p></div><span className="lobby-status"><i/> Waiting for players</span></div><div className="lobby-player-list">{Array.from({ length: room.maxPlayers }, (_, i) => room.players[i]).map((p, i) => p ? <div className="lobby-player" key={p.id}><div className="player-avatar">{p.displayName.slice(0, 1).toUpperCase()}</div><div className="player-name"><b>{p.displayName}{p.id === session?.id && <small>YOU</small>}</b>{p.isHost && <span><Crown size={12}/> Host</span>}</div><span className={`ready-badge ${p.ready ? "ready" : "waiting"}`}>{p.ready ? <><Check size={12}/> Ready</> : "Not ready"}</span><span className={`connection-dot ${p.connection}`}/></div> : <div className="lobby-empty-slot" key={`empty-${i}`}><span className="empty-avatar">+</span><div><b>Open seat</b><small>Share your invite to fill this spot</small></div></div>)}</div><div className="lobby-config"><span><b>Game</b>{getGameTitle(room.gameId)}</span><span><b>Table size</b>{room.maxPlayers} players</span><span><b>Mode</b>Virtual chips only</span></div><div className="lobby-actions">{isHost ? <Button onClick={start} disabled={starting || room.players.length < (room.gameId === "blackjack" ? 1 : room.gameId === "callbreak" ? 4 : 2) || room.players.some(p => !p.ready)}>{starting ? "Starting…" : "Start game"} <ArrowRight size={16}/></Button> : <Button onClick={ready} variant={me?.ready ? "outline" : "gold"}>{me?.ready ? "I'm ready ✓" : "Ready up"}</Button>}<Button variant="ghost" onClick={leave}>Leave room</Button></div>{error && <div className="form-error" role="alert">{error}</div>}{connecting && <p className="connection-note"><span className="spinner mini"/> Connecting to live table…</p>}</div><div className="lobby-tip"><Sparkles size={16}/> Invite your friends with the code above. Everyone must be ready before the host can start.</div></div>;
+  return <div className="page-container standard-page narrow-page"><div className="lobby-heading"><div className="eyebrow">THE TABLE IS SETTING</div><h1>{room.name}</h1><p>{getGameTitle(room.gameId)} · {room.visibility === "private" ? "Private room" : "Public room"}</p></div><div className="room-invite-card"><div><span className="eyebrow">ROOM CODE</span><strong>{room.code}</strong><small>Share this code with friends</small></div><CopyShare room={room}/></div><div className="lobby-card"><div className="lobby-card-header"><div><h2>Players</h2><p>{room.players.length} of {room.maxPlayers} seats taken</p></div><span className="lobby-status"><i/> Waiting for players</span></div><div className="lobby-player-list">{Array.from({ length: room.maxPlayers }, (_, i) => room.players[i]).map((p, i) => p ? <div className="lobby-player" key={p.id}><div className="player-avatar">{p.displayName.slice(0, 1).toUpperCase()}</div><div className="player-name"><b>{p.displayName}{p.id === session?.id && <small>YOU</small>}</b>{p.isHost && <span><Crown size={12}/> Host</span>}</div><span className={`ready-badge ${p.ready ? "ready" : "waiting"}`}>{p.ready ? <><Check size={12}/> Ready</> : "Not ready"}</span><span className={`connection-dot ${p.connection}`}/></div> : <div className="lobby-empty-slot" key={`empty-${i}`}><span className="empty-avatar">+</span><div><b>Open seat</b><small>Share your invite to fill this spot</small></div></div>)}</div><div className="lobby-config"><span><b>Game</b>{getGameTitle(room.gameId)}</span><span><b>Table size</b>{room.maxPlayers} players</span><span><b>Mode</b>Virtual chips only</span></div>{room.gameId === "teen-patti" && room.gameOptions?.teenPatti && <div className="lobby-config teen-patti-lobby-config"><span><b>Starting chips / player</b>{room.gameOptions.teenPatti.startingStack.toLocaleString("en-IN")}</span><span><b>Boot / starting bid</b>{room.gameOptions.teenPatti.bootAmount.toLocaleString("en-IN")}</span><span><b>Maximum pot / round</b>{room.gameOptions.teenPatti.maxPot.toLocaleString("en-IN")}</span></div>}<div className="lobby-actions">{isHost ? <Button onClick={start} disabled={starting || room.players.length < (room.gameId === "blackjack" ? 1 : room.gameId === "callbreak" ? 4 : 2) || room.players.some(p => !p.ready)}>{starting ? "Starting…" : "Start game"} <ArrowRight size={16}/></Button> : <Button onClick={ready} variant={me?.ready ? "outline" : "gold"}>{me?.ready ? "I'm ready ✓" : "Ready up"}</Button>}<Button variant="ghost" onClick={leave}>Leave room</Button></div>{error && <div className="form-error" role="alert">{error}</div>}{connecting && <p className="connection-note"><span className="spinner mini"/> Connecting to live table…</p>}</div><div className="lobby-tip"><Sparkles size={16}/> Invite your friends with the code above. Everyone must be ready before the host can start.</div></div>;
 }
 
 const ruleText: Array<{ id: GameId; name: string; sections: Array<[string, string]> }> = [

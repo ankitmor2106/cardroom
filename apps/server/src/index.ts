@@ -17,7 +17,7 @@ import {
   startNextCallbreakRound, createRummyGame, drawRummyCard, discardRummyCard, declareRummy,
 } from "@cardroom/game-engines";
 import { createRoomSchema, joinRoomSchema, actionEnvelopeSchema, chatSchema, gameIdSchema } from "@cardroom/validation";
-import type { GameId, PlayerId, PlayerSummary, RoomSummary } from "@cardroom/shared/contracts";
+import type { GameId, PlayerId, PlayerSummary, RoomSummary, TeenPattiRoomOptions } from "@cardroom/shared/contracts";
 import type { BlackjackState } from "@cardroom/shared/games/blackjack";
 import type { HoldemState } from "@cardroom/shared/games/holdem";
 import type { TeenPattiState } from "@cardroom/shared/games/teenPatti";
@@ -38,7 +38,7 @@ interface Player { id: PlayerId; displayName: string; avatar: string; ready: boo
 interface Room {
   id: string; code: string; name: string; gameId: GameId; visibility: "public" | "private"; status: "waiting" | "playing" | "finished";
   hostId: PlayerId; maxPlayers: number; createdAt: string; passwordHash?: string; players: Map<PlayerId, Player>;
-  state?: unknown; seq: number; lastSeqByPlayer: Map<PlayerId, number>; idempotency: Set<string>; queue: Promise<void>; chat: Array<{ id: string; playerId: string; displayName: string; text: string; createdAt: string }>;
+  gameOptions?: { teenPatti?: TeenPattiRoomOptions }; state?: unknown; seq: number; lastSeqByPlayer: Map<PlayerId, number>; idempotency: Set<string>; queue: Promise<void>; chat: Array<{ id: string; playerId: string; displayName: string; text: string; createdAt: string }>;
 }
 interface AuthUser { sub: string; displayName: string }
 
@@ -69,7 +69,7 @@ function makeCode(): string {
 }
 function roomSummary(room: Room): RoomSummary {
   const players: PlayerSummary[] = [...room.players.values()].map(p => ({ id: p.id, displayName: p.displayName, avatar: p.avatar, isHost: p.id === room.hostId, ready: p.ready, connection: p.connection }));
-  return { id: room.id, code: room.code, name: room.name, gameId: room.gameId, visibility: room.visibility, status: room.status, hostId: room.hostId, players, maxPlayers: room.maxPlayers, createdAt: room.createdAt };
+  return { id: room.id, code: room.code, name: room.name, gameId: room.gameId, visibility: room.visibility, status: room.status, hostId: room.hostId, players, maxPlayers: room.maxPlayers, createdAt: room.createdAt, ...(room.gameOptions ? { gameOptions: room.gameOptions } : {}) };
 }
 function getRoomByCode(code: string): Room | undefined { const id = roomByCode.get(code.toUpperCase()); return id ? rooms.get(id) : undefined; }
 function roomPlayer(room: Room, playerId: PlayerId): Player {
@@ -149,7 +149,11 @@ function startEngine(room: Room): unknown {
   switch (room.gameId) {
     case "blackjack": return createBlackjackBettingGame(players.map(p => ({ id: p.id, chips: 10_000 })), {}, secureRandom);
     case "holdem": return createHoldemGame(players, { smallBlind: 5, bigBlind: 10 }, secureRandom);
-    case "teen-patti": return createTeenPattiGame(players, 10, secureRandom);
+    case "teen-patti": {
+      const options = room.gameOptions?.teenPatti ?? { startingStack: 1_000, bootAmount: 10, maxPot: 1_000 };
+      const configuredPlayers = players.map(player => ({ ...player, chips: options.startingStack }));
+      return createTeenPattiGame(configuredPlayers, options.bootAmount, secureRandom, options.maxPot);
+    }
     case "callbreak": return createCallbreakRound(players.map(p => ({ id: p.id })), 1, secureRandom);
     case "rummy-13": return createRummyGame("rummy-13", players.map(p => p.id), secureRandom);
     case "rummy-10": return createRummyGame("rummy-10", players.map(p => p.id), secureRandom);
@@ -292,11 +296,12 @@ app.post("/api/rooms", async (request, reply) => {
   const owner = request.user as AuthUser;
   const data = parsed.data; const id = randomUUID(); const code = makeCode();
   const player: Player = { id: owner.sub, displayName: data.displayName, avatar: "avatar-01", ready: true, connection: "connected", socketIds: new Set() };
-  const room: Room = { id, code, name: data.name, gameId: data.gameId, visibility: data.visibility, status: "waiting", hostId: owner.sub, maxPlayers: data.maxPlayers, createdAt: new Date().toISOString(), ...(data.password ? { passwordHash: hashRoomPassword(data.password) } : {}), players: new Map([[owner.sub, player]]), seq: 0, lastSeqByPlayer: new Map(), idempotency: new Set(), queue: Promise.resolve(), chat: [] };
+  const gameOptions = data.gameOptions as Room["gameOptions"];
+  const room: Room = { id, code, name: data.name, gameId: data.gameId, visibility: data.visibility, status: "waiting", hostId: owner.sub, maxPlayers: data.maxPlayers, createdAt: new Date().toISOString(), ...(data.password ? { passwordHash: hashRoomPassword(data.password) } : {}), ...(gameOptions ? { gameOptions } : {}), players: new Map([[owner.sub, player]]), seq: 0, lastSeqByPlayer: new Map(), idempotency: new Set(), queue: Promise.resolve(), chat: [] };
   rooms.set(id, room); roomByCode.set(code, id);
   if (prisma) {
     await prisma.player.upsert({ where: { id: owner.sub }, create: { id: owner.sub, displayName: data.displayName }, update: { displayName: data.displayName } });
-    await prisma.room.create({ data: { id, code, name: data.name, gameId: data.gameId, visibility: data.visibility, hostId: owner.sub, maxPlayers: data.maxPlayers, ...(room.passwordHash ? { passwordHash: room.passwordHash } : {}), players: { create: { playerId: owner.sub, isHost: true, ready: true, connection: "connected" } } } });
+    await prisma.room.create({ data: { id, code, name: data.name, gameId: data.gameId, visibility: data.visibility, hostId: owner.sub, maxPlayers: data.maxPlayers, ...(room.passwordHash ? { passwordHash: room.passwordHash } : {}), ...(room.gameOptions ? { settingsJson: room.gameOptions as unknown as Prisma.InputJsonValue } : {}), players: { create: { playerId: owner.sub, isHost: true, ready: true, connection: "connected" } } } });
   }
   return reply.code(201).send({ room: roomSummary(room) });
 });
@@ -521,7 +526,7 @@ function broadcastGameState(room: Room): void {
 }
 async function restorePersistedRooms(): Promise<void> {
   if (!prisma) return;
-  const saved = await prisma.room.findMany({ include: { players: { include: { player: true } } } });
+  const saved = await prisma.room.findMany({ include: { players: { include: { player: true } } } }) as unknown as Array<Prisma.RoomGetPayload<{ include: { players: { include: { player: true } } } }> & { settingsJson: Prisma.JsonValue | null }>;
   for (const row of saved) {
     const players = new Map<PlayerId, Player>();
     for (const membership of row.players) players.set(membership.playerId, {
@@ -542,7 +547,8 @@ async function restorePersistedRooms(): Promise<void> {
       id: row.id, code: row.code, name: row.name, gameId: row.gameId as GameId,
       visibility: row.visibility as "public" | "private", status: row.status as Room["status"],
       hostId: row.hostId, maxPlayers: row.maxPlayers, createdAt: row.createdAt.toISOString(),
-      ...(row.passwordHash ? { passwordHash: row.passwordHash } : {}), players,
+      ...(row.passwordHash ? { passwordHash: row.passwordHash } : {}),
+      ...(row.settingsJson ? { gameOptions: row.settingsJson as unknown as NonNullable<Room["gameOptions"]> } : {}), players,
       ...(row.stateJson ? { state: row.stateJson } : {}), seq: row.seq,
       lastSeqByPlayer, idempotency, queue: Promise.resolve(), chat: [],
     };

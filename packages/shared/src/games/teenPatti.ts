@@ -20,6 +20,8 @@ export interface TeenPattiState {
   deck: Card[];
   pot: number;
   boot: number;
+  /** Maximum total contribution to the pot in one round. */
+  maxPot: number;
   /** Blind stake. A seen wager is 2x–4x this value and sets the next blind stake to half the wager. */
   currentStake: number;
   turnIndex: number;
@@ -43,6 +45,9 @@ export function teenPattiWagerBounds(currentStake: number, seen: boolean, availa
   const nominalMax = currentStake * multiplier * 2;
   let max = Math.max(0, Math.min(nominalMax, available));
   if (seen) max -= max % 2;
+  // If a short stack or the remaining pot cap is below the normal minimum,
+  // allow that exact available amount as the final wager.
+  if (available > 0 && max < min) return { min: available, max: available };
   return { min, max };
 }
 
@@ -184,13 +189,21 @@ function validatePlayers(players: Array<{ id: PlayerId; chips: number }>, boot: 
   }
 }
 
-export function createTeenPattiGame(players: Array<{ id: PlayerId; chips: number }>, boot = 10, random: RandomSource = Math.random): TeenPattiState {
+export function createTeenPattiGame(
+  players: Array<{ id: PlayerId; chips: number }>,
+  boot = 10,
+  random: RandomSource = Math.random,
+  maxPot = 10_000,
+): TeenPattiState {
   validatePlayers(players, boot);
+  if (!Number.isSafeInteger(maxPot) || maxPot < boot * (players.length + 1)) {
+    throw new RangeError("Maximum pot must cover every player's boot and at least one minimum opening wager");
+  }
   const deck = shuffle(createDeck(), random).filter((card): card is Card => !card.joker);
   const result: TeenPattiState = {
     gameId: "teen-patti", status: "playing",
     players: players.map(player => ({ ...player, chips: player.chips - boot, cards: [], seen: false, folded: false, contribution: boot })),
-    deck, pot: boot * players.length, boot, currentStake: boot, turnIndex: 0, maxTurns: 240, turns: 0, history: [],
+    deck, pot: boot * players.length, boot, maxPot, currentStake: boot, turnIndex: 0, maxTurns: 240, turns: 0, history: [],
   };
   // Deal one card at a time around the table, rather than three consecutively to each seat.
   for (let pass = 0; pass < 3; pass += 1) for (const player of result.players) player.cards.push(result.deck.shift()!);
@@ -266,6 +279,7 @@ export function teenPattiAction(state: TeenPattiState, playerId: PlayerId, actio
     if (!previous || previous.folded || !previous.seen || previous.id === playerId) throw new Error("The immediately previous betting player must also be seen");
     const cost = next.currentStake * 2;
     if (player.chips < cost) throw new Error("Not enough chips to pay for the sideshow");
+    if (next.pot + cost > next.maxPot) throw new Error("The sideshow would exceed the maximum pot");
     player.chips -= cost;
     player.contribution += cost;
     next.pot += cost;
@@ -275,6 +289,7 @@ export function teenPattiAction(state: TeenPattiState, playerId: PlayerId, actio
     next.turnIndex = next.players.findIndex(item => item.id === previous.id);
     next.history.push({ playerId, action: "sideshow-request", amount: cost });
     next.turns += 1;
+    if (next.pot >= next.maxPot) { delete next.pendingSideshow; finishByShowdown(next); return next; }
     return next;
   }
 
@@ -284,6 +299,7 @@ export function teenPattiAction(state: TeenPattiState, playerId: PlayerId, actio
     const cost = teenPattiShowCost(next.currentStake, player.seen, opponent.seen);
     if (cost === null) throw new Error("A seen player cannot request a show against a blind player");
     if (player.chips < cost) throw new Error("Insufficient chips to show; pack instead");
+    if (next.pot + cost > next.maxPot) throw new Error("The show would exceed the maximum pot");
     player.chips -= cost;
     player.contribution += cost;
     next.pot += cost;
@@ -295,21 +311,25 @@ export function teenPattiAction(state: TeenPattiState, playerId: PlayerId, actio
   if (action !== "blind" && action !== "chaal") throw new Error("Unsupported Teen Patti action");
   if (action === "blind" && player.seen) throw new Error("A seen player cannot switch back to blind");
   const seenAction = action === "chaal";
-  const bounds = teenPattiWagerBounds(next.currentStake, player.seen || seenAction, player.chips);
+  const remainingPot = Math.max(0, next.maxPot - next.pot);
+  const bounds = teenPattiWagerBounds(next.currentStake, player.seen || seenAction, Math.min(player.chips, remainingPot));
   const wager = amount ?? bounds.min;
   if (!Number.isSafeInteger(wager) || wager < bounds.min || wager > bounds.max) {
     throw new RangeError(`Wager must be between ${bounds.min} and ${bounds.max} chips`);
   }
-  if ((player.seen || seenAction) && wager % 2 !== 0) throw new RangeError("Seen chaal must use an even number of chips so the next blind stake stays whole");
+  if ((player.seen || seenAction) && wager % 2 !== 0 && next.pot + wager < next.maxPot) {
+    throw new RangeError("Seen chaal must use an even number of chips so the next blind stake stays whole; an odd final cap contribution is allowed because betting ends immediately");
+  }
   player.chips -= wager;
   player.contribution += wager;
   next.pot += wager;
   if (seenAction) player.seen = true;
   // Traditional rule: blind wager becomes the next stake; seen wager is halved.
-  next.currentStake = seenAction ? wager / 2 : wager;
+  next.currentStake = seenAction ? Math.floor(wager / 2) : wager;
   next.lastActionPlayerId = playerId;
   next.history.push({ playerId, action, amount: wager });
   next.turns += 1;
+  if (next.pot >= next.maxPot) { finishByShowdown(next); return next; }
   if (next.turns > next.maxTurns) { finishByShowdown(next); return next; }
   nextTurn(next, next.turnIndex);
   return next;
@@ -318,5 +338,5 @@ export function teenPattiAction(state: TeenPattiState, playerId: PlayerId, actio
 /** Start another server-authoritative round while carrying forward each player's stack. */
 export function teenPattiNextRound(state: TeenPattiState, random: RandomSource = Math.random): TeenPattiState {
   if (state.status !== "complete") throw new Error("Finish the current Teen Patti round first");
-  return createTeenPattiGame(state.players.map(player => ({ id: player.id, chips: player.chips })), state.boot, random);
+  return createTeenPattiGame(state.players.map(player => ({ id: player.id, chips: player.chips })), state.boot, random, state.maxPot);
 }

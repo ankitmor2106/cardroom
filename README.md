@@ -42,7 +42,7 @@ App is live at **http://localhost:4000**. Point a domain and reverse-proxy at th
 npm run dev              # local dev (web + server in parallel)
 npm run build            # build all workspaces
 npm run typecheck        # TypeScript check across monorepo
-npm run test:unit        # 56 game-engine unit tests
+npm run test:unit        # 60 game-engine unit tests
 npm run test:engine-smoke # rule-engine smoke suite
 npm run lint             # ESLint across apps and packages
 npm run db:generate      # regenerate Prisma client
@@ -63,3 +63,15 @@ scripts/        Rule-engine smoke test runners
 ```
 
 All game engines are pure TypeScript shared between client and server — no rewrite needed if the runtime changes.
+
+## Table UI and Teen Patti room settings
+
+The multiplayer table shows each chip game's player stack beside the seat and the live pot / table wagers in the center of the felt. Game actions (bets, bids, calls, card actions, and other controls) appear in a right-hand control rail on desktop and move below the table on smaller screens. Completed hands open a dedicated results view; Callbreak opens its scorecard after each round.
+
+When creating an online Teen Patti room, the host can configure:
+
+- **Starting chips per player** — each player's initial virtual-chip stack.
+- **Boot / starting bid** — the mandatory contribution each round.
+- **Maximum pot per round** — a server-enforced hard cap. If less than a normal minimum wager remains, the final wager may fill the exact remainder and the active hands go to showdown.
+
+The selected table size is used to validate that the pot cap can cover every seat's boot and one minimum opening wager. These room settings are visible to all players in the lobby and carry into subsequent rounds.
