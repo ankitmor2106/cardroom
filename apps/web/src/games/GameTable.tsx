@@ -52,6 +52,8 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
   const [callbreakDealPasses, setCallbreakDealPasses] = useState<5 | 8>(5);
   const teenPattiDealPlayed = useRef(false);
   const callbreakDealStage = useRef({ round: 0, stage: 0 as 0 | 1 | 2 });
+  const callbreakStatusRef = useRef(state.status);
+  callbreakStatusRef.current = state.status;
   const callbreakHistoryLength = gameId === "callbreak" ? (state as CallbreakState).history.length : 0;
   const previousCallbreakHistoryLength = useRef(callbreakHistoryLength);
   const preferences = useSessionStore(s => s.preferences);
@@ -124,13 +126,13 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
     const reducedMotion = useSessionStore.getState().preferences.reducedMotion;
     const duration = reducedMotion ? 420 : 520 + teen.players.length * 3 * 105 + 520;
     const hideTimer = window.setTimeout(() => setShowTeenPattiDeal(false), duration);
-    return () => { dealTimers.forEach(window.clearTimeout); window.clearTimeout(hideTimer); };
+    return () => { dealTimers.forEach(window.clearTimeout); window.clearTimeout(hideTimer); teenPattiDealPlayed.current = false; };
   }, [gameId, online, state.status]);
   const callbreakRound = gameId === "callbreak" ? (state as CallbreakState).round : 0;
   useEffect(() => {
     if (!online || gameId !== "callbreak") return;
     const callbreak = state as CallbreakState;
-    const tracked = callbreakDealStage.current;
+    const tracked = { ...callbreakDealStage.current };
     let passes: 5 | 8 | null = null;
 
     // Fresh round: show five cards per seat, then pause for the trump-choice auction.
@@ -153,7 +155,12 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
     const reducedMotion = useSessionStore.getState().preferences.reducedMotion;
     const dealTimers = reducedMotion ? [] : Array.from({ length: passes }, (_, index) => window.setTimeout(() => playUiSound("deal"), 0.28 + index * 0.22));
     const hideTimer = window.setTimeout(() => setShowCallbreakDeal(false), reducedMotion ? 420 : passes === 5 ? 1_850 : 2_850);
-    return () => { dealTimers.forEach(window.clearTimeout); window.clearTimeout(hideTimer); };
+    const scheduledStage = { ...callbreakDealStage.current };
+    return () => {
+      dealTimers.forEach(window.clearTimeout);
+      window.clearTimeout(hideTimer);
+      if (callbreakStatusRef.current === callbreak.status && callbreakDealStage.current.round === scheduledStage.round && callbreakDealStage.current.stage === scheduledStage.stage) callbreakDealStage.current = tracked;
+    };
   }, [gameId, online, callbreakRound, state.status]);
 
   useEffect(() => {
@@ -248,7 +255,7 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
       <div className="table-ornament one"/><div className="table-ornament two"/>
       <div className="table-brand">CARDROOM <span>✦</span></div>
       <div className="table-status">{callbreakRoundComplete ? complete ? "MATCH COMPLETE" : "ROUND SCORED" : complete ? "ROUND COMPLETE" : gameId === "blackjack" && state.status === "betting" ? "BETTING OPEN" : isMyTurn ? "YOUR TURN" : `${playerName(activeId ?? "", room)}'S TURN`}</div>
-      <div className="opponent-seats">
+      <div className={`opponent-seats ${seats.length >= 6 ? "many-opponents" : ""}`}>
         {seats.filter(p => p.id !== playerId).map((p, index) => {
           const isActive = activeId === p.id;
           const typedPlayer = p as unknown as { hole?: CardData[]; cards?: CardData[]; hand?: CardData[]; hands?: Array<{ cards: CardData[] }>; hiddenCards?: number; hiddenCardsCount?: number; holeCount?: number; cardsCount?: number; handCount?: number; chips?: number };

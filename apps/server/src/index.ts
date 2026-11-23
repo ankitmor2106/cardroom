@@ -343,6 +343,32 @@ app.post("/api/rooms/:code/join", async (request, reply) => {
   return { room: roomSummary(room) };
 });
 
+app.post("/api/rooms/:code/remove-player", async (request, reply) => {
+  const code = (request.params as { code: string }).code.toUpperCase();
+  const room = getRoomByCode(code);
+  if (!room) return reply.code(404).send({ error: { code: "ROOM_NOT_FOUND", message: "That room code does not exist." } });
+  const parsed = z.object({ playerId: z.string().uuid() }).safeParse(request.body);
+  if (!parsed.success) return reply.code(400).send({ error: { code: "VALIDATION", message: "Choose a player to remove." } });
+  const user = request.user as AuthUser;
+  if (room.hostId !== user.sub) return reply.code(403).send({ error: { code: "HOST_ONLY", message: "Only the host can remove players." } });
+  if (room.status !== "waiting") return reply.code(409).send({ error: { code: "ROOM_STARTED", message: "Players can only be removed before the game starts." } });
+  if (parsed.data.playerId === room.hostId) return reply.code(400).send({ error: { code: "HOST_CANNOT_BE_REMOVED", message: "The host cannot remove themselves." } });
+  const player = room.players.get(parsed.data.playerId);
+  if (!player) return reply.code(404).send({ error: { code: "PLAYER_NOT_FOUND", message: "That player is no longer in the room." } });
+
+  if (prisma) await prisma.roomPlayer.deleteMany({ where: { roomId: room.id, playerId: player.id } });
+  room.players.delete(player.id);
+  for (const socketId of player.socketIds) {
+    const playerSocket = io.sockets.sockets.get(socketId);
+    if (playerSocket) {
+      playerSocket.emit("room:removed", { code: room.code, message: "The host removed you from the room." });
+      await playerSocket.leave(room.id);
+    }
+  }
+  io.to(room.id).emit("room:updated", roomSummary(room));
+  return { room: roomSummary(room) };
+});
+
 app.get("/api/profile", async request => {
   const user = request.user as AuthUser;
   const player = prisma ? await prisma.player.findUnique({ where: { id: user.sub }, include: { results: true } }) : null;

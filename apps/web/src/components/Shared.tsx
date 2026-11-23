@@ -32,7 +32,7 @@ export function PageShell({ children }: { children: ReactNode }) { return <><Hea
 
 export function SectionTitle({ eyebrow, title, text, action }: { eyebrow?: string; title: string; text?: string; action?: ReactNode }) { return <div className="section-title"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h2>{title}</h2>{text && <p>{text}</p>}</div>{action}</div>; }
 
-export function Button({ children, variant = "gold", className = "", disabled, type = "button", onClick }: { children: ReactNode; variant?: "gold" | "outline" | "ghost" | "danger"; className?: string; disabled?: boolean; type?: "button" | "submit"; onClick?: () => void }) { return <button type={type} className={`button button-${variant} ${className}`} disabled={disabled} onClick={() => { if (!disabled) { playUiSound("tap"); onClick?.(); } }}>{children}</button>; }
+export function Button({ children, variant = "gold", className = "", disabled, type = "button", onClick, ariaLabel }: { children: ReactNode; variant?: "gold" | "outline" | "ghost" | "danger"; className?: string; disabled?: boolean; type?: "button" | "submit"; onClick?: () => void; ariaLabel?: string }) { return <button type={type} className={`button button-${variant} ${className}`} disabled={disabled} aria-label={ariaLabel} onClick={() => { if (!disabled) { playUiSound("tap"); onClick?.(); } }}>{children}</button>; }
 
 export function Toast({ message, onClose }: { message: string; onClose: () => void }) { useEffect(() => { const t = window.setTimeout(onClose, 3600); return () => window.clearTimeout(t); }, [message, onClose]); return <div className="toast" role="status"><span>{message}</span><button className="icon-button" onClick={onClose} aria-label="Dismiss notification"><X size={16}/></button></div>; }
 
