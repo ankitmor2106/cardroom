@@ -2059,6 +2059,7 @@ button.playing-card { cursor: pointer; }
     gap: 8px;
     padding: 4px 0;
   }
+  .opponent-seats:empty { display: none; }
   .opponent-seat, .opponent-0, .opponent-1, .opponent-2 { align-self: auto; margin: 0; min-width: 96px; max-width: 145px; }
   .table-center { order: 3; width: 100%; min-height: 135px; }
   .table-center .community-cards { min-height: 88px; }
