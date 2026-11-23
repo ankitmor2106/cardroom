@@ -34,5 +34,13 @@
   "overrides": {
     "tslib": "2.8.1"
   },
-  "type": "module"
+  "type": "module",
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true,
+    "prisma@6.19.3": true
+  }
 }

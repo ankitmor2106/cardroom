@@ -421,8 +421,8 @@ button.playing-card { cursor: pointer; }
   .split-section { gap: 45px; }
   .game-intro-layout { gap: 35px; }
   .game-intro-art { min-height: 360px; }
-  .table-felt { min-height: 550px; border-radius: 32% / 24%; padding-inline: 30px; }
-  .opponent-seats { inset-inline: 4%; }
+  .table-felt { min-height: 600px; border-radius: 40% / 26%; padding-inline: 30px; }
+  .opponent-seats { inset-inline: 4%; inset-top: 10%; }
   .my-seat { left: 4%; right: 4%; }
   .game-action-panel { align-items: flex-start; flex-direction: column; }
   .action-buttons { justify-content: flex-start; width: 100%; }
@@ -491,60 +491,80 @@ button.playing-card { cursor: pointer; }
   .settings-row select { min-width: 125px; max-width: 145px; }
   .range-value input { width: 90px; }
   /* Mobile table: portrait-first compact oval, anchored hand/action tray. */
-  .game-page-container { width: calc(100% - 22px); padding-top: 17px; }
-  .gameplay-topbar { align-items: flex-start; }
-  .gameplay-topbar h1 { font-size: 1.4rem; }
-  .gameplay-top-actions { gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-  .gameplay-top-actions .button { min-height: 34px; padding-inline: 9px; }
-  .connection-pill, .room-code-mini { font-size: .57rem; padding: 6px 8px; }
-  .table-felt { min-height: 520px; border-width: 5px; border-radius: 45% / 21%; padding: 25px 9px 18px; }
-  .table-felt::before { inset: 9px; }
-  .table-brand { top: 25px; font-size: .48rem; }
-  .table-status { top: 45px; font-size: .48rem; }
-  .opponent-seats { inset: 10% 2% 45%; justify-content: space-around; }
-  .opponent-seat { min-width: 75px; padding: 5px 3px; gap: 3px; }
-  .seat-avatar { width: 30px; height: 30px; font-size: .72rem; }
-  .seat-info b { font-size: .58rem; }
-  .seat-info span { font-size: .48rem; }
-  .seat-card-backs .playing-card { margin-left: -24px; }
+  .game-page-container { width: calc(100% - 16px); padding-top: 10px; padding-bottom: 20px; }
+  .gameplay-topbar { align-items: flex-start; margin-bottom: 10px; }
+  .gameplay-topbar h1 { font-size: 1.2rem; margin: 2px 0 0; }
+  .gameplay-top-actions { gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+  .gameplay-top-actions .button { min-height: 32px; padding-inline: 8px; font-size: .7rem; }
+  .connection-pill, .room-code-mini { font-size: .55rem; padding: 5px 7px; }
+  .table-felt { min-height: calc(100vh - 260px); border-width: 6px; border-radius: 50% / 30%; padding: 30px 14px 22px; }
+  .table-felt::before { inset: 10px; }
+  .table-brand { top: 22px; font-size: .5rem; }
+  .table-status { top: 42px; font-size: .5rem; }
+  .opponent-seats { inset: 8% 5% 40%; justify-content: space-around; }
+  .opponent-seat { min-width: 80px; padding: 6px 6px; gap: 4px; }
+  .seat-avatar { width: 32px; height: 32px; font-size: .75rem; }
+  .seat-info b { font-size: .6rem; }
+  .seat-info span { font-size: .5rem; }
+  .seat-card-backs .playing-card { margin-left: -20px; }
   .seat-card-backs .playing-card:first-child { margin-left: 0; }
   .opponent-0 { margin-left: 0; }
   .opponent-2 { margin-right: 0; }
-  .table-center { top: 42%; width: 88%; }
-  .pot-label { font-size: .55rem; margin-bottom: 6px; }
-  .community-cards, .trick-cards { min-height: 86px; gap: 4px; }
-  .center-emblem { font-size: 3rem; }
-  .table-center-note { font-size: .58rem; margin-top: 2px; }
-  .rummy-piles { gap: 15px; }
-  .my-seat { left: 2%; right: 2%; bottom: 15px; gap: 7px; }
-  .my-player-info { min-width: 142px; padding: 4px 9px 4px 5px; }
-  .my-player-info .seat-avatar { width: 27px; height: 27px; }
-  .my-hand { min-height: 97px; padding-inline: 2px; }
-  .my-hand .playing-card { width: clamp(34px, 10vw, 52px); height: clamp(52px, 14vw, 74px); margin-left: -13px; }
-  .my-hand .playing-card .card-corner { font-size: .48rem; }
-  .my-hand .playing-card .card-center { font-size: 1.35rem; }
-  .my-hand.rummy-hand { min-height: 86px; overflow-x: auto; justify-content: flex-start; padding: 0 5px 4px; }
-  .my-hand.rummy-hand .playing-card { width: clamp(30px, 8.5vw, 42px); height: clamp(46px, 12vw, 60px); margin-left: -10px; }
+  .table-center { top: 38%; width: 90%; }
+  .pot-label { font-size: .58rem; margin-bottom: 8px; }
+  .community-cards, .trick-cards { min-height: 90px; gap: 6px; }
+  .center-emblem { font-size: 3.5rem; }
+  .table-center-note { font-size: .6rem; margin-top: 4px; }
+  .rummy-piles { gap: 18px; }
+  .my-seat { left: 4%; right: 4%; bottom: 18px; gap: 8px; }
+  .my-player-info { min-width: 148px; padding: 5px 10px 5px 6px; }
+  .my-player-info .seat-avatar { width: 28px; height: 28px; }
+  .my-hand { min-height: 100px; padding-inline: 4px; }
+  .my-hand .playing-card { width: clamp(36px, 11vw, 54px); height: clamp(54px, 15vw, 76px); margin-left: -14px; }
+  .my-hand .playing-card .card-corner { font-size: .5rem; }
+  .my-hand .playing-card .card-center { font-size: 1.4rem; }
+  .my-hand.rummy-hand { min-height: 88px; overflow-x: auto; justify-content: flex-start; padding: 0 6px 4px; }
+  .my-hand.rummy-hand .playing-card { width: clamp(32px, 9vw, 44px); height: clamp(48px, 13vw, 62px); margin-left: -10px; }
   .my-hand.rummy-hand .playing-card:first-child { margin-left: 0; }
-  .game-action-panel { padding: 13px; gap: 12px; }
+  .game-action-panel { padding: 12px; gap: 10px; margin-top: 12px; }
   .action-context { min-width: 0; }
-  .action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-  .action-buttons .button { width: 100%; min-height: 40px; padding-inline: 6px; font-size: .7rem; }
-  .raise-control { min-height: 40px; justify-content: space-between; }
+  .action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .action-buttons .button { width: 100%; min-height: 38px; padding-inline: 8px; font-size: .72rem; }
+  .raise-control { min-height: 38px; justify-content: space-between; }
   .raise-control input, .raise-control select { width: 67px; }
-  .game-footnote { font-size: .59rem; }
+  .game-footnote { font-size: .6rem; margin-top: 8px; }
   .live-connection-banner { flex-wrap: wrap; }
   .live-connection-banner small { margin-left: 0; width: 100%; }
+  .eyebrow { font-size: .6rem; }
+  .gameplay-topbar .eyebrow { font-size: .6rem; }
 }
 @media (max-width: 390px) {
   .hero-actions { flex-direction: column; }
   .hero-actions .button { width: 100%; }
   .hero-art { transform: scale(.7); margin-bottom: -105px; }
-  .table-felt { min-height: 500px; }
-  .my-hand .playing-card { margin-left: -16px; }
-  .opponent-seats { inset-inline: 0; }
-  .opponent-seat { min-width: 64px; }
-  .seat-card-backs .playing-card.small { width: 33px; height: 47px; }
+  .game-page-container { width: calc(100% - 12px); padding-top: 6px; }
+  .table-felt { min-height: calc(100vh - 240px); border-width: 4px; padding: 22px 8px 16px; }
+  .table-brand { top: 18px; font-size: .45rem; }
+  .table-status { top: 36px; font-size: .45rem; }
+  .opponent-seats { inset: 7% 2% 40%; }
+  .opponent-seat { min-width: 68px; padding: 4px 2px; gap: 2px; }
+  .seat-avatar { width: 26px; height: 26px; font-size: .65rem; }
+  .seat-info b { font-size: .52rem; }
+  .seat-info span { font-size: .44rem; }
+  .table-center { top: 36%; width: 92%; }
+  .pot-label { font-size: .5rem; }
+  .community-cards, .trick-cards { min-height: 76px; gap: 4px; }
+  .center-emblem { font-size: 2.8rem; }
+  .my-seat { left: 2%; right: 2%; bottom: 12px; gap: 5px; }
+  .my-player-info { min-width: 120px; padding: 4px 7px 4px 4px; gap: 6px; }
+  .my-player-info .seat-avatar { width: 24px; height: 24px; font-size: .6rem; }
+  .my-player-info b { font-size: .55rem; }
+  .my-player-info span { font-size: .48rem; }
+  .my-hand { min-height: 85px; }
+  .my-hand .playing-card { width: clamp(30px, 9.5vw, 44px); height: clamp(46px, 13.5vw, 64px); margin-left: -12px; }
+  .my-hand .playing-card .card-center { font-size: 1.15rem; }
+  .game-action-panel { padding: 10px; gap: 8px; }
+  .action-buttons .button { min-height: 36px; font-size: .68rem; }
 }
 @media (min-width: 1500px) {
   .page-container { width: min(1280px, calc(100% - 80px)); }
@@ -1891,20 +1911,21 @@ button.playing-card { cursor: pointer; }
   .action-buttons { justify-content: flex-start; }
 }
 @media (max-width: 620px) {
-  .gameplay-topbar h1 { font-size: 1.55rem; }
-  .table-status { font-size: .63rem; }
-  .seat-avatar { width: 35px; height: 35px; }
-  .seat-info b { font-size: .73rem; }
-  .seat-info span { font-size: .64rem; }
-  .pot-label { font-size: .72rem; }
-  .pot-label b { font-size: .84rem; }
-  .table-center-note { font-size: .68rem; }
-  .my-player-info b { font-size: .69rem; }
-  .my-player-info span { font-size: .57rem; }
-  .player-chip-stack { min-width: 48px; }
-  .player-chip-stack > b { font-size: .66rem; }
-  .player-chip-stack-art { transform: scale(.86); transform-origin: center top; height: 19px; }
-  .table-pot-display .pot-coin-heap { transform: scale(.82); transform-origin: center bottom; margin-bottom: -5px; }
+  .gameplay-topbar h1 { font-size: 1.3rem; }
+  .table-status { font-size: .5rem; }
+  .seat-avatar { width: 30px; height: 30px; }
+  .seat-info b { font-size: .58rem; }
+  .seat-info span { font-size: .48rem; }
+  .pot-label { font-size: .58rem; }
+  .pot-label b { font-size: .68rem; }
+  .table-center-note { font-size: .6rem; }
+  .my-player-info b { font-size: .6rem; }
+  .my-player-info span { font-size: .5rem; }
+  .player-chip-stack { min-width: 44px; }
+  .player-chip-stack > b { font-size: .6rem; }
+  .player-chip-stack-art { transform: scale(.78); transform-origin: center top; height: 17px; }
+  .table-pot-display .pot-coin-heap { transform: scale(.72); transform-origin: center bottom; margin-bottom: -8px; }
+  .dealer-status-label { font-size: .6rem; }
   .round-results-content { padding: 18px 12px; }
   .round-results-intro p { font-size: .8rem; }
   .round-results-actions { flex-direction: column; align-items: stretch; }
@@ -1991,4 +2012,81 @@ button.playing-card { cursor: pointer; }
   .table-center { top: 44%; }
   .center-emblem { font-size: 4.4rem; }
   .game-action-panel { border-radius: 16px; }
+}
+
+/* On narrow screens, turn the felt into a vertical game board so seats, pot,
+   and hand each get their own space instead of sharing absolute coordinates. */
+@media (max-width: 700px) {
+  .game-page-container { width: min(100% - 24px, 560px); padding-top: 16px; padding-bottom: 30px; }
+  .gameplay-topbar { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .gameplay-topbar h1 { font-size: 1.6rem; }
+  .gameplay-top-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .gameplay-top-actions .connection-pill { order: 0; }
+  .gameplay-top-actions .room-code-mini { order: 1; }
+  .gameplay-top-actions .blackjack-sound-toggle { order: 2; margin-left: auto; }
+  .gameplay-top-actions .button { order: 3; }
+  .table-felt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-height: 0;
+    padding: 25px 14px 18px;
+    border-width: 7px;
+    border-radius: 28px;
+  }
+  .table-felt::before { inset: 8px; border-radius: 19px; }
+  .table-ornament { display: none; }
+  .table-brand, .table-status, .opponent-seats, .table-center, .my-seat {
+    position: relative;
+    inset: auto;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    transform: none;
+  }
+  .table-brand { order: 0; }
+  .table-status { order: 1; }
+  .opponent-seats {
+    order: 2;
+    width: 100%;
+    min-height: 95px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .opponent-seat, .opponent-0, .opponent-1, .opponent-2 { align-self: auto; margin: 0; min-width: 96px; max-width: 145px; }
+  .table-center { order: 3; width: 100%; min-height: 135px; }
+  .table-center .community-cards { min-height: 88px; }
+  .table-center .center-emblem { font-size: 3.7rem; line-height: 1; }
+  .my-seat { order: 4; width: 100%; display: flex; gap: 6px; }
+  .my-player-info { min-width: 0; max-width: 100%; }
+  .my-hand { min-height: 102px; max-width: 100%; overflow-x: auto; overflow-y: visible; justify-content: flex-start; padding: 12px 14px 4px; }
+  .my-hand .playing-card { margin-left: -17px; }
+  .my-hand .playing-card:first-child { margin-left: 0; }
+  .tp-blind-note { max-width: 100%; }
+  .game-action-panel { width: 100%; padding: 15px; }
+  .game-action-panel .action-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .game-action-panel .action-buttons > .button { width: 100%; min-width: 0; white-space: normal; }
+  .game-action-panel .action-context { min-width: 0; }
+  .tp-online-controls, .tp-online-action-buttons { width: 100%; }
+  .tp-online-current-bet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tp-online-current-bet span:last-child { grid-column: 1 / -1; }
+  .tp-online-action-buttons { display: grid; grid-template-columns: 1fr 1fr; }
+  .tp-online-action-buttons .button { min-width: 0; white-space: normal; }
+  .round-results-page { width: 100%; }
+  .round-results-page .gameplay-topbar { flex-direction: row; align-items: center; }
+  .round-results-page .gameplay-top-actions { width: auto; }
+}
+
+@media (max-width: 390px) {
+  .gameplay-top-actions { gap: 5px; }
+  .gameplay-top-actions .connection-pill, .gameplay-top-actions .room-code-mini { padding: 6px 8px; font-size: .65rem; }
+  .table-felt { padding-inline: 9px; }
+  .opponent-seat, .opponent-0, .opponent-1, .opponent-2 { min-width: 82px; }
+  .game-action-panel .action-buttons, .tp-online-action-buttons { grid-template-columns: 1fr; }
 }

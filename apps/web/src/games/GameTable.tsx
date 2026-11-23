@@ -177,6 +177,24 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
   const complete = state.status === "complete";
   const callbreakRoundComplete = gameId === "callbreak" && (state.status === "round-complete" || state.status === "complete");
   const isMyTurn = !callbreakRoundComplete && activeId === playerId;
+  const soundForAction = (action: string) => {
+    if (["blind", "chaal", "sideshow", "set-bet", "confirm-bet", "all-in", "call", "bet", "raise"].includes(action)) return "chip" as const;
+    if (["show", "choose-trump", "start-deal", "next-round"].includes(action)) return "shuffle" as const;
+    if (["pack", "fold", "surrender", "sit-out", "pass-trump"].includes(action)) return "loss" as const;
+    if (["play", "hit", "draw-stock", "draw-discard", "discard"].includes(action)) return "card" as const;
+    return "tap" as const;
+  };
+  const emit = (action: string, payload?: Record<string, unknown>) => {
+    try {
+      setError("");
+      onAction(action, payload);
+      if (gameId === "holdem" || gameId.startsWith("rummy")) playUiSound(soundForAction(action));
+      if (gameId === "callbreak" && action === "play") setSelectedCard(null);
+      if (gameId.startsWith("rummy") && (action === "discard" || action === "declare")) {
+        setSelectedCard(null); setSelectedGroup([]); setGroups([]); setRummyMode("discard");
+      }
+    } catch (e) { setError(e instanceof Error ? e.message : "That action is not available."); playUiSound("error"); }
+  };
   const showRoundResults = complete || callbreakRoundComplete;
   if (showRoundResults) {
     const canHostNextRound = online && room?.hostId === playerId && (gameId === "blackjack" || gameId === "teen-patti");
@@ -222,29 +240,6 @@ export function GameTable({ gameId, state, playerId, online = false, room, onAct
       else if (!groups.some(group => group.cardIds.includes(card.id))) setSelectedGroup(prev => prev.includes(card.id) ? prev.filter(id => id !== card.id) : [...prev, card.id]);
     }
     else if (gameId === "blackjack" || gameId === "holdem" || gameId === "teen-patti") setSelectedCard(selectedCard === card.id ? null : card.id);
-  };
-
-  const soundForAction = (action: string) => {
-    if (["blind", "chaal", "sideshow", "set-bet", "confirm-bet", "all-in", "call", "bet", "raise"].includes(action)) return "chip" as const;
-    if (["show", "choose-trump", "start-deal", "next-round"].includes(action)) return "shuffle" as const;
-    if (["pack", "fold", "surrender", "sit-out", "pass-trump"].includes(action)) return "loss" as const;
-    if (["play", "hit", "draw-stock", "draw-discard", "discard"].includes(action)) return "card" as const;
-    if (["stand", "check", "bid", "declare"].includes(action)) return "tap" as const;
-    return "tap" as const;
-  };
-
-  const emit = (action: string, payload?: Record<string, unknown>) => {
-    try {
-      setError("");
-      onAction(action, payload);
-      // Blackjack, Teen Patti and Callbreak already sequence their own game-specific
-      // cues. The remaining tables use this common action cue.
-      if (gameId === "holdem" || gameId.startsWith("rummy")) playUiSound(soundForAction(action));
-      if (gameId === "callbreak" && action === "play") setSelectedCard(null);
-      if (gameId.startsWith("rummy") && (action === "discard" || action === "declare")) {
-        setSelectedCard(null); setSelectedGroup([]); setGroups([]); setRummyMode("discard");
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : "That action is not available."); playUiSound("error"); }
   };
 
   return <div className="gameplay-wrap">
